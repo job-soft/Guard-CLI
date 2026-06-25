@@ -8,6 +8,49 @@ use syn::{BinOp, Expr, ExprBinary, File};
 
 const CHECK_NAME: &str = "unchecked-arithmetic";
 
+/// Variable-name fragments that suggest index/counter math → downgrade to Low.
+const INDEX_NAMES: &[&str] = &["idx", "index", "count", "len", "offset", "pos", "step"];
+/// Single-char index variables (exact match).
+const INDEX_CHARS: &[&str] = &["i", "j", "k", "n", "x", "y", "z"];
+/// Variable-name fragments that suggest financial math → upgrade to High.
+const FINANCIAL_NAMES: &[&str] = &["amount", "balance", "fee", "price", "supply", "reward", "stake", "fund", "value", "total"];
+
+fn severity_for_operand_name(name: &str) -> Option<Severity> {
+    let lower = name.to_lowercase();
+    for &fin in FINANCIAL_NAMES {
+        if lower.contains(fin) {
+            return Some(Severity::High);
+        }
+    }
+    for &idx in INDEX_NAMES {
+        if lower.contains(idx) {
+            return Some(Severity::Low);
+        }
+    }
+    if INDEX_CHARS.contains(&lower.as_str()) {
+        return Some(Severity::Low);
+    }
+    None
+}
+
+fn expr_ident(e: &Expr) -> Option<String> {
+    match e {
+        Expr::Path(p) => p.path.get_ident().map(|i| i.to_string()),
+        _ => None,
+    }
+}
+
+fn infer_severity(e: &ExprBinary) -> Severity {
+    for operand in [&*e.left, &*e.right] {
+        if let Some(name) = expr_ident(operand) {
+            if let Some(sev) = severity_for_operand_name(&name) {
+                return sev;
+            }
+        }
+    }
+    Severity::Medium
+}
+
 /// Flags wrapping integer arithmetic that is not expressed via checked/saturating APIs.
 ///
 /// Heuristic: in `#[contractimpl]` methods, binary `+`, `-`, `*` (and `+=`, `-=`, `*=`) where
@@ -66,9 +109,15 @@ impl Visit<'_> for ArithVisitor<'_> {
                 BinOp::MulAssign(_) => "*=",
                 _ => "?",
             };
+            let severity = infer_severity(i);
+            let url_fragment = match severity {
+                Severity::High => "unchecked-arithmetic-high",
+                Severity::Low => "unchecked-arithmetic-low",
+                _ => "unchecked-arithmetic-medium",
+            };
             self.out.push(Finding {
                 check_name: CHECK_NAME.to_string(),
-                severity: Severity::Medium,
+                severity,
                 file_path: String::new(),
                 line: i.span().start().line,
                 function_name: self.fn_name.clone(),
@@ -78,10 +127,9 @@ impl Visit<'_> for ArithVisitor<'_> {
                      `checked_mul`, or `saturating_*` to avoid silent overflow.",
                     self.fn_name
                 ),
-                rule_url: Some(
-                    "https://github.com/SorobanGuard/Guard-CLI/blob/main/docs/checks.md#unchecked-arithmetic-medium"
-                        .to_string(),
-                ),
+                rule_url: Some(format!(
+                    "https://github.com/SorobanGuard/Guard-CLI/blob/main/docs/checks.md#{url_fragment}"
+                )),
             });
         }
         visit::visit_expr_binary(self, i);
@@ -201,6 +249,48 @@ impl C {
         )?;
         let hits = UncheckedArithmeticCheck.run(&file, "");
         assert!(hits.is_empty());
+        Ok(())
+    }
+
+    #[test]
+    fn financial_name_gets_high_severity() -> Result<(), syn::Error> {
+        let file = parse_file(
+            r#"
+use soroban_sdk::{contractimpl, Env};
+pub struct C;
+#[contractimpl]
+impl C {
+    pub fn transfer(env: Env, amount: i128, fee: i128) -> i128 {
+        let _ = env;
+        amount - fee
+    }
+}
+"#,
+        )?;
+        let hits = UncheckedArithmeticCheck.run(&file, "");
+        assert_eq!(hits.len(), 1);
+        assert_eq!(hits[0].severity, Severity::High);
+        Ok(())
+    }
+
+    #[test]
+    fn index_name_gets_low_severity() -> Result<(), syn::Error> {
+        let file = parse_file(
+            r#"
+use soroban_sdk::{contractimpl, Env};
+pub struct C;
+#[contractimpl]
+impl C {
+    pub fn next(env: Env, i: u32) -> u32 {
+        let _ = env;
+        i + 1
+    }
+}
+"#,
+        )?;
+        let hits = UncheckedArithmeticCheck.run(&file, "");
+        assert_eq!(hits.len(), 1);
+        assert_eq!(hits[0].severity, Severity::Low);
         Ok(())
     }
 }
