@@ -1,6 +1,6 @@
 //! Unchecked `+`, `-`, `*`, and compound assignments in contract methods.
 
-use crate::util::contractimpl_functions;
+use crate::util::contractimpl_functions_excluding_test;
 use crate::{Check, Finding, Severity};
 use syn::spanned::Spanned;
 use syn::visit::{self, Visit};
@@ -54,8 +54,8 @@ fn infer_severity(e: &ExprBinary) -> Severity {
 /// Flags wrapping integer arithmetic that is not expressed via checked/saturating APIs.
 ///
 /// Heuristic: in `#[contractimpl]` methods, binary `+`, `-`, `*` (and `+=`, `-=`, `*=`) where
-/// both operands are not compile-time literals. This may include benign index math; treat as a
-/// review signal for token balances and amounts (`i128`, `u128`, etc.).
+/// both operands are not compile-time literals. Functions inside `#[cfg(test)]` or `mod tests`
+/// are excluded.
 pub struct UncheckedArithmeticCheck;
 
 impl Check for UncheckedArithmeticCheck {
@@ -65,7 +65,7 @@ impl Check for UncheckedArithmeticCheck {
 
     fn run(&self, file: &File, _source: &str) -> Vec<Finding> {
         let mut out = Vec::new();
-        for method in contractimpl_functions(file) {
+        for method in contractimpl_functions_excluding_test(file) {
             let fn_name = method.sig.ident.to_string();
             let mut v = ArithVisitor {
                 fn_name: fn_name.clone(),

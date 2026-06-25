@@ -3,6 +3,7 @@
 pub mod admin;
 pub mod annotations;
 pub mod auth;
+pub mod global_state;
 pub mod hardcoded_address;
 pub mod overflow;
 pub mod std_imports;
@@ -14,6 +15,7 @@ mod util;
 pub use admin::UnprotectedAdminCheck;
 pub use annotations::MissingContractAnnotationCheck;
 pub use auth::MissingRequireAuthCheck;
+pub use global_state::MutableGlobalStateCheck;
 pub use hardcoded_address::HardcodedAddressCheck;
 pub use overflow::UncheckedArithmeticCheck;
 pub use std_imports::ForbiddenStdImportsCheck;
@@ -45,6 +47,9 @@ pub struct Finding {
     /// Link to the check's documentation section (exposed in `--json` output for dashboard integrations).
     #[serde(skip_serializing_if = "Option::is_none")]
     pub rule_url: Option<String>,
+    /// One-liner fix hint shown in pretty output and included in `--json`.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub suggestion: Option<String>,
 }
 
 /// A static analyzer check implemented against a parsed `syn::File`.

@@ -42,6 +42,11 @@ impl Check for MissingTtlExtensionCheck {
                          `extend_ttl` on it in the same function. Without a TTL extension the \
                          entry can expire and be archived off the ledger."
                     ),
+                    rule_url: None,
+                    suggestion: Some(
+                        "Call `env.storage().persistent().extend_ttl(&key, threshold, extend_to)` after the write."
+                            .to_string(),
+                    ),
                 });
             }
         }

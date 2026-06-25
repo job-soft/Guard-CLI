@@ -71,6 +71,10 @@ impl Check for UnprotectedAdminCheck {
                     "https://github.com/SorobanGuard/Guard-CLI/blob/main/docs/checks.md#unprotected-admin-high"
                         .to_string(),
                 ),
+                suggestion: Some(
+                    "Add `env.require_auth();` or verify the caller against a stored admin address."
+                        .to_string(),
+                ),
             });
         }
         out

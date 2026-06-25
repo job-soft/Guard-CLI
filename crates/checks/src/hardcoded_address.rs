@@ -31,6 +31,11 @@ impl Check for HardcodedAddressCheck {
                          Pass addresses in as contract parameters or configuration instead of \
                          baking them into source."
                     ),
+                    rule_url: None,
+                    suggestion: Some(
+                        "Accept the address as a contract parameter or read it from storage instead of hardcoding."
+                            .to_string(),
+                    ),
                 });
             }
         }
