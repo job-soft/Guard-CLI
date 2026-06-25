@@ -30,7 +30,12 @@ pub fn scan_directory(root: &Path, excludes: &[String]) -> Result<Vec<Finding>, 
     let checks = default_checks();
     let mut findings = Vec::new();
 
-    for entry in WalkDir::new(&root).into_iter().filter_map(|e| e.ok()) {
+    for entry in WalkDir::new(&root)
+        // Never follow symlinks: prevents infinite loops on symlink cycles (issue #43).
+        .follow_links(false)
+        .into_iter()
+        .filter_map(|e| e.ok())
+    {
         if !entry.file_type().is_file() {
             continue;
         }
