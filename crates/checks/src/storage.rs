@@ -120,6 +120,10 @@ impl Visit<'_> for StorageVisitor<'_> {
                     "https://github.com/SorobanGuard/Guard-CLI/blob/main/docs/checks.md#unsafe-storage-patterns-medium"
                         .to_string(),
                 ),
+                suggestion: Some(
+                    "Use `env.storage().persistent()` for long-lived state; reserve `temporary()` for scratch data only."
+                        .to_string(),
+                ),
             });
         }
         visit::visit_expr_method_call(self, i);
@@ -144,6 +148,10 @@ impl Visit<'_> for StorageVisitor<'_> {
                 ),
                 rule_url: Some(
                     "https://github.com/SorobanGuard/Guard-CLI/blob/main/docs/checks.md#unsafe-storage-patterns-medium"
+                        .to_string(),
+                ),
+                suggestion: Some(
+                    "Use `symbol_short!(\"literal\")` or a named constant for storage keys."
                         .to_string(),
                 ),
             });

@@ -1,6 +1,6 @@
 //! Unchecked `+`, `-`, `*`, and compound assignments in contract methods.
 
-use crate::util::contractimpl_functions;
+use crate::util::contractimpl_functions_excluding_test;
 use crate::{Check, Finding, Severity};
 use syn::spanned::Spanned;
 use syn::visit::{self, Visit};
@@ -11,8 +11,8 @@ const CHECK_NAME: &str = "unchecked-arithmetic";
 /// Flags wrapping integer arithmetic that is not expressed via checked/saturating APIs.
 ///
 /// Heuristic: in `#[contractimpl]` methods, binary `+`, `-`, `*` (and `+=`, `-=`, `*=`) where
-/// both operands are not compile-time literals. This may include benign index math; treat as a
-/// review signal for token balances and amounts (`i128`, `u128`, etc.).
+/// both operands are not compile-time literals. Functions inside `#[cfg(test)]` or `mod tests`
+/// are excluded.
 pub struct UncheckedArithmeticCheck;
 
 impl Check for UncheckedArithmeticCheck {
@@ -22,7 +22,7 @@ impl Check for UncheckedArithmeticCheck {
 
     fn run(&self, file: &File, _source: &str) -> Vec<Finding> {
         let mut out = Vec::new();
-        for method in contractimpl_functions(file) {
+        for method in contractimpl_functions_excluding_test(file) {
             let fn_name = method.sig.ident.to_string();
             let mut v = ArithVisitor {
                 fn_name: fn_name.clone(),
@@ -82,6 +82,11 @@ impl Visit<'_> for ArithVisitor<'_> {
                     "https://github.com/SorobanGuard/Guard-CLI/blob/main/docs/checks.md#unchecked-arithmetic-medium"
                         .to_string(),
                 ),
+                suggestion: Some(format!(
+                    "Replace `{op}` with `checked_{method}` or `saturating_{method}` to avoid silent overflow.",
+                    op = op,
+                    method = match op { "+"|"+=" => "add", "-"|"-=" => "sub", _ => "mul" },
+                )),
             });
         }
         visit::visit_expr_binary(self, i);
@@ -201,6 +206,67 @@ impl C {
         )?;
         let hits = UncheckedArithmeticCheck.run(&file, "");
         assert!(hits.is_empty());
+        Ok(())
+    }
+
+    #[test]
+    fn ignores_arithmetic_in_cfg_test_mod() -> Result<(), syn::Error> {
+        let file = parse_file(
+            r#"
+use soroban_sdk::{contractimpl, Env};
+
+pub struct C;
+
+#[contractimpl]
+impl C {
+    pub fn sum(env: Env, a: i128, b: i128) -> i128 {
+        let _ = env;
+        a.checked_add(b).unwrap()
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[contractimpl]
+    impl C {
+        pub fn test_helper(env: Env, a: i128, b: i128) -> i128 {
+            let _ = env;
+            a + b
+        }
+    }
+}
+"#,
+        )?;
+        let hits = UncheckedArithmeticCheck.run(&file, "");
+        assert!(hits.is_empty(), "arithmetic in #[cfg(test)] mod should not be flagged");
+        Ok(())
+    }
+
+    #[test]
+    fn ignores_arithmetic_in_mod_tests() -> Result<(), syn::Error> {
+        let file = parse_file(
+            r#"
+use soroban_sdk::{contractimpl, Env};
+
+pub struct C;
+
+mod tests {
+    use super::*;
+
+    #[contractimpl]
+    impl C {
+        pub fn helper(env: Env, x: i128) -> i128 {
+            let _ = env;
+            x + 1
+        }
+    }
+}
+"#,
+        )?;
+        let hits = UncheckedArithmeticCheck.run(&file, "");
+        assert!(hits.is_empty(), "arithmetic in mod tests should not be flagged");
         Ok(())
     }
 }

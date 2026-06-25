@@ -33,6 +33,11 @@ impl Check for ForbiddenStdImportsCheck {
                          `std::` import will break the WASM build.",
                         trimmed.trim_end_matches(';')
                     ),
+                    rule_url: None,
+                    suggestion: Some(
+                        "Remove the `use std::` import or replace with a `no_std`-compatible alternative."
+                            .to_string(),
+                    ),
                 });
             }
         }

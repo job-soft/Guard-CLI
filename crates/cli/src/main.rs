@@ -192,6 +192,9 @@ fn print_pretty(findings: &[Finding], root_label: String) {
         );
         println!("         {} `{}`", "function:".dimmed(), f.function_name);
         println!("         {}", f.description);
+        if let Some(suggestion) = &f.suggestion {
+            println!("         {} {}", "suggestion:".dimmed(), suggestion);
+        }
         println!();
     }
 
@@ -225,6 +228,8 @@ mod tests {
             line: 10,
             function_name: "set_balance".to_string(),
             description: "Missing auth".to_string(),
+            rule_url: None,
+            suggestion: None,
         }];
 
         let payload = build_sarif(&findings);

@@ -41,6 +41,9 @@ pub struct Finding {
     /// Link to the check's documentation section (exposed in `--json` output for dashboard integrations).
     #[serde(skip_serializing_if = "Option::is_none")]
     pub rule_url: Option<String>,
+    /// One-liner fix hint shown in pretty output and included in `--json`.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub suggestion: Option<String>,
 }
 
 /// A static analyzer check implemented against a parsed `syn::File`.
