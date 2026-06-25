@@ -56,6 +56,13 @@ Output as JSON (useful for CI pipelines or the web dashboard):
 cargo run -p soroban-guard-cli -- scan ./path/to/contract-crate --json
 ```
 
+Skip paths (generated code, vendored crates, etc.) with one or more `--exclude` glob patterns,
+matched relative to the scanned path:
+
+```bash
+cargo run -p soroban-guard-cli -- scan ./path/to/contract-crate --exclude 'vendor/**' --exclude '**/generated/*.rs'
+```
+
 ### Exit codes
 
 | Code | Meaning |

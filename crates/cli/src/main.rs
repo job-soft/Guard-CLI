@@ -24,13 +24,16 @@ enum Commands {
         /// Print findings as JSON (`{ "findings": [...] }`)
         #[arg(long)]
         json: bool,
+        /// Glob pattern to skip (relative to `path`); repeatable, e.g. `--exclude 'vendor/**'`
+        #[arg(long = "exclude", value_name = "GLOB")]
+        exclude: Vec<String>,
     },
 }
 
 fn main() {
     let cli = Cli::parse();
     match cli.command {
-        Commands::Scan { path, json } => match scan_directory(&path) {
+        Commands::Scan { path, json, exclude } => match scan_directory(&path, &exclude) {
             Ok(findings) => {
                 if json {
                     if let Err(e) = print_json(&findings) {
