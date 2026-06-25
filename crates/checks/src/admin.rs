@@ -29,6 +29,10 @@ const SENSITIVE_NAMES: &[&str] = &[
     "kill",
 ];
 
+/// Prefixes that mark a function as sensitive (e.g., `set_admin_fee`, `pause_withdrawals`,
+/// `emergency_shutdown`).
+const SENSITIVE_PREFIXES: &[&str] = &["set_admin", "pause_", "emergency_"];
+
 /// `pub` methods whose name matches a sensitive admin pattern and whose body never calls
 /// `require_auth` or `require_auth_for_args` (any receiver).
 pub struct UnprotectedAdminCheck;
@@ -45,7 +49,7 @@ impl Check for UnprotectedAdminCheck {
                 continue;
             }
             let name = method.sig.ident.to_string();
-            if !SENSITIVE_NAMES.contains(&name.as_str()) {
+            if !is_sensitive_name(&name) {
                 continue;
             }
             if body_has_auth_gate(&method.block) {
@@ -67,6 +71,13 @@ impl Check for UnprotectedAdminCheck {
         }
         out
     }
+}
+
+fn is_sensitive_name(name: &str) -> bool {
+    if SENSITIVE_NAMES.contains(&name) {
+        return true;
+    }
+    SENSITIVE_PREFIXES.iter().any(|p| name.starts_with(p))
 }
 
 fn body_has_auth_gate(block: &Block) -> bool {
@@ -180,6 +191,50 @@ impl C {
         )?;
         let hits = UnprotectedAdminCheck.run(&file, "");
         assert!(hits.is_empty());
+        Ok(())
+    }
+
+    #[test]
+    fn flags_prefix_match_set_admin_fee() -> Result<(), syn::Error> {
+        let file = parse_file(
+            r#"
+use soroban_sdk::{contractimpl, Env};
+
+pub struct C;
+
+#[contractimpl]
+impl C {
+    pub fn set_admin_fee(env: Env, fee: i128) {
+        let _ = (env, fee);
+    }
+}
+"#,
+        )?;
+        let hits = UnprotectedAdminCheck.run(&file, "");
+        assert_eq!(hits.len(), 1);
+        assert_eq!(hits[0].function_name, "set_admin_fee");
+        Ok(())
+    }
+
+    #[test]
+    fn flags_prefix_match_pause_withdrawals() -> Result<(), syn::Error> {
+        let file = parse_file(
+            r#"
+use soroban_sdk::{contractimpl, Env};
+
+pub struct C;
+
+#[contractimpl]
+impl C {
+    pub fn pause_withdrawals(env: Env) {
+        let _ = env;
+    }
+}
+"#,
+        )?;
+        let hits = UnprotectedAdminCheck.run(&file, "");
+        assert_eq!(hits.len(), 1);
+        assert_eq!(hits[0].function_name, "pause_withdrawals");
         Ok(())
     }
 
