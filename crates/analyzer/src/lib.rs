@@ -17,8 +17,15 @@ pub enum ScanError {
 }
 
 /// Recursively scan `.rs` files under `root` and aggregate findings from every check.
-pub fn scan_directory(root: &Path) -> Result<Vec<Finding>, ScanError> {
+///
+/// `excludes` are glob patterns (e.g. `vendor/**`, `**/generated/*.rs`) matched against each
+/// file's path relative to `root`; matching files are skipped entirely.
+pub fn scan_directory(root: &Path, excludes: &[String]) -> Result<Vec<Finding>, ScanError> {
     let root = root.canonicalize()?;
+    let exclude_patterns: Vec<glob::Pattern> = excludes
+        .iter()
+        .filter_map(|p| glob::Pattern::new(p).ok())
+        .collect();
     let checks = default_checks();
     let mut findings = Vec::new();
 
@@ -37,17 +44,24 @@ pub fn scan_directory(root: &Path) -> Result<Vec<Finding>, ScanError> {
             continue;
         }
 
-        let content = std::fs::read_to_string(path)?;
-        let syn_file = syn::parse_file(&content).map_err(|e| ScanError::Parse {
-            path: path.to_path_buf(),
-            message: e.to_string(),
-        })?;
-
         let file_label = path
             .strip_prefix(&root)
             .unwrap_or(path)
             .to_string_lossy()
             .to_string();
+
+        if exclude_patterns
+            .iter()
+            .any(|p| p.matches(&file_label) || p.matches_path(path))
+        {
+            continue;
+        }
+
+        let content = std::fs::read_to_string(path)?;
+        let syn_file = syn::parse_file(&content).map_err(|e| ScanError::Parse {
+            path: path.to_path_buf(),
+            message: e.to_string(),
+        })?;
 
         for check in &checks {
             let mut from_check = check.run(&syn_file, &content);
