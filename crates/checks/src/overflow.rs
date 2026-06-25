@@ -110,11 +110,6 @@ impl Visit<'_> for ArithVisitor<'_> {
                 _ => "?",
             };
             let severity = infer_severity(i);
-            let url_fragment = match severity {
-                Severity::High => "unchecked-arithmetic-high",
-                Severity::Low => "unchecked-arithmetic-low",
-                _ => "unchecked-arithmetic-medium",
-            };
             self.out.push(Finding {
                 check_name: CHECK_NAME.to_string(),
                 severity,
@@ -127,9 +122,11 @@ impl Visit<'_> for ArithVisitor<'_> {
                      `checked_mul`, or `saturating_*` to avoid silent overflow.",
                     self.fn_name
                 ),
-                rule_url: Some(format!(
-                    "https://github.com/SorobanGuard/Guard-CLI/blob/main/docs/checks.md#{url_fragment}"
-                )),
+                rule_url: Some(
+                    "https://github.com/SorobanGuard/Guard-CLI/blob/main/docs/checks.md#unchecked-arithmetic-high--medium--low"
+                        .to_string(),
+                ),
+                suggestion: None,
             });
         }
         visit::visit_expr_binary(self, i);

@@ -1,7 +1,7 @@
 use clap::{Parser, Subcommand};
 use colored::Colorize;
 use soroban_guard_analyzer::scan_directory;
-use soroban_guard_checks::{default_checks, Check, Finding, Severity};
+use soroban_guard_checks::{default_checks, Finding, Severity};
 use std::fs;
 use std::path::{Path, PathBuf};
 
@@ -36,7 +36,7 @@ enum Commands {
 fn main() {
     let cli = Cli::parse();
     match cli.command {
-        Commands::Scan { path, json, quiet } => match scan_directory(&path) {
+        Commands::Scan { path, json, quiet } => match scan_directory(&path, &[]) {
             Ok(findings) => {
                 let any_high = findings
                     .iter()
@@ -157,6 +157,20 @@ fn write_output(path: &Path, payload: &str) -> Result<(), std::io::Error> {
     fs::write(path, payload)
 }
 
+fn json_payload(findings: &[Finding]) -> Result<String, serde_json::Error> {
+    #[derive(serde::Serialize)]
+    struct Out<'a> {
+        findings: &'a [Finding],
+    }
+
+    serde_json::to_string_pretty(&Out { findings })
+}
+
+fn print_json(findings: &[Finding]) -> Result<(), serde_json::Error> {
+    println!("{}", json_payload(findings)?);
+    Ok(())
+}
+
 fn print_pretty(findings: &[Finding], root_label: String) {
     println!();
     println!(
@@ -242,6 +256,26 @@ mod tests {
             payload["runs"][0]["results"][0]["ruleId"],
             "missing-require-auth"
         );
+    }
+
+    #[test]
+    fn json_payload_includes_rule_url() {
+        let rule_url =
+            "https://github.com/SorobanGuard/Guard-CLI/blob/main/docs/checks.md#missing-require-auth-high";
+        let findings = vec![Finding {
+            check_name: "missing-require-auth".to_string(),
+            severity: Severity::High,
+            file_path: "src/lib.rs".to_string(),
+            line: 10,
+            function_name: "set_balance".to_string(),
+            description: "Missing auth".to_string(),
+            rule_url: Some(rule_url.to_string()),
+            suggestion: None,
+        }];
+
+        let payload: serde_json::Value =
+            serde_json::from_str(&json_payload(&findings).unwrap()).unwrap();
+        assert_eq!(payload["findings"][0]["rule_url"], rule_url);
     }
 
     #[test]

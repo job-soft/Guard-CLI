@@ -143,3 +143,49 @@ The Soroban SDK requires a `#[contract]` struct to be present alongside `#[contr
 - Only `#[contract]` on a `struct` item is recognized.
 
 **Fixture:** tests in `crates/checks/src/annotations.rs`
+
+---
+
+## `missing-ttl-extension` (Low)
+
+**What it detects**
+
+Writes to persistent storage in a `#[contractimpl]` method when that method never calls
+`extend_ttl` on persistent storage.
+
+**Why it matters**
+
+Persistent ledger entries still expire. Extending their TTL after mutation prevents live
+contract state from being archived unexpectedly.
+
+**Fixture:** tests in `crates/checks/src/ttl.rs`
+
+---
+
+## `forbidden-std-imports` (High)
+
+**What it detects**
+
+`use std::...` imports in files that contain a `#[contractimpl]`.
+
+**Why it matters**
+
+Soroban contracts compile for a `no_std` WASM target, so imports from `std` break the contract
+build.
+
+**Fixture:** tests in `crates/checks/src/std_imports.rs`
+
+---
+
+## `hardcoded-address` (Medium)
+
+**What it detects**
+
+56-character, `G`-prefixed Stellar public-key strings embedded in source code.
+
+**Why it matters**
+
+Hardcoded deployment-specific addresses make contracts difficult to migrate and can leave a
+redeployed contract pointing at the wrong account.
+
+**Fixture:** tests in `crates/checks/src/hardcoded_address.rs`

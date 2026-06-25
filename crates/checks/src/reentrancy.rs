@@ -41,6 +41,7 @@ impl Check for ReentrancyRiskCheck {
                         "https://github.com/SorobanGuard/Guard-CLI/blob/main/docs/checks.md#reentrancy-risk-high"
                             .to_string(),
                     ),
+                    suggestion: None,
                 });
             }
         }

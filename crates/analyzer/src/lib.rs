@@ -3,7 +3,6 @@
 //! Each [`Check`](soroban_guard_checks::Check) runs independently on the same parsed file;
 //! findings are concatenated with **no shared mutable state** between checks.
 
-use rayon::prelude::*;
 use soroban_guard_checks::{default_checks, Finding};
 use std::path::{Path, PathBuf};
 use thiserror::Error;
@@ -74,43 +73,9 @@ pub fn scan_directory(root: &Path, excludes: &[String]) -> Result<Vec<Finding>, 
             for f in &mut from_check {
                 f.file_path = file_label.clone();
             }
-            path.extension().and_then(|s| s.to_str()) == Some("rs")
-        })
-        .collect();
-
-    let mut findings: Vec<Finding> = entries
-        .par_iter()
-        .map(|entry| {
-            let path = entry.path();
-            let content = std::fs::read_to_string(path)?;
-            let syn_file = syn::parse_file(&content).map_err(|e| ScanError::Parse {
-                path: path.to_path_buf(),
-                message: e.to_string(),
-            })?;
-
-            let file_label = path
-                .strip_prefix(&root)
-                .unwrap_or(path)
-                .to_string_lossy()
-                .to_string();
-
-            let file_findings: Vec<Finding> = checks
-                .iter()
-                .flat_map(|check| {
-                    let mut from_check = check.run(&syn_file, &content);
-                    for f in &mut from_check {
-                        f.file_path.clone_from(&file_label);
-                    }
-                    from_check
-                })
-                .collect();
-
-            Ok(file_findings)
-        })
-        .collect::<Result<Vec<Vec<Finding>>, ScanError>>()?
-        .into_iter()
-        .flatten()
-        .collect();
+            findings.extend(from_check);
+        }
+    }
 
     findings.sort_by(|a, b| {
         a.file_path

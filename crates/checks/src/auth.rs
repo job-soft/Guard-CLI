@@ -104,7 +104,7 @@ fn is_storage_mutation_call(m: &ExprMethodCall) -> bool {
     receiver_chain_contains_storage(&m.receiver)
 }
 
-fn is_env_require_auth(m: &ExprMethodCall) -> bool {
+fn is_env_require_auth(m: &ExprMethodCall, env_name: &str) -> bool {
     if m.method != "require_auth" && m.method != "require_auth_for_args" {
         return false;
     }

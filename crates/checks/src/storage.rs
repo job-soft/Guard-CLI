@@ -90,8 +90,18 @@ fn symbol_new_second_arg_is_string_lit(call: &ExprCall) -> bool {
             lit: syn::Lit::Str(_),
             ..
         }) => true,
-        // A bare path like `MY_CONST` or `crate::keys::FOO` is a named constant — treat as stable.
-        Expr::Path(_) => true,
+        // Uppercase paths like `MY_CONST` or `crate::keys::FOO` are named constants.
+        Expr::Path(path) => path
+            .path
+            .segments
+            .last()
+            .is_some_and(|segment| {
+                let name = segment.ident.to_string();
+                !name.is_empty()
+                    && name
+                        .bytes()
+                        .all(|byte| byte.is_ascii_uppercase() || byte.is_ascii_digit() || byte == b'_')
+            }),
         _ => false,
     }
 }
