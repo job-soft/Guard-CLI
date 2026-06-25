@@ -93,3 +93,93 @@ Names like `set_owner` strongly suggest privilege; without any auth call the sca
 - `Symbol::new` with a `const` or macro-expanded literal may still be flagged if it is not a `syn::Lit::Str`.
 
 **Fixture:** `test-contracts/storage-vulnerable/`, `test-contracts/storage-safe/`
+
+---
+
+## `reentrancy-risk` (High)
+
+**Status:** Phase 3
+
+**What it detects**
+
+Inside `#[contractimpl]` methods, any call to `invoke_contract` or `invoke_contract_check` that occurs **after** a storage write (`set`, `remove`, `extend_ttl`, `bump`, `append`) and **before** a subsequent storage read (which would indicate the developer re-checked state after the call).
+
+**Why it matters**
+
+Soroban's cross-contract call API allows calling untrusted contracts. If state has been mutated before the call, the callee can observe or re-enter the contract in an intermediate state. The checks-effects-interactions pattern (write last, or re-read state) eliminates the risk.
+
+**Limitations**
+
+- Purely sequential within a single method body; does not follow helper calls.
+- A storage read anywhere after the write clears the flag regardless of whether it covers the written key.
+
+**Fixture:** `test-contracts/reentrancy-vulnerable/`, `test-contracts/reentrancy-safe/`
+
+---
+
+## `integer-division-truncation` (Medium)
+
+**Status:** Phase 3
+
+**What it detects**
+
+Inside `#[contractimpl]` methods, binary `/` where **at least one operand is not an integer literal**, and `/=` compound assignments. Literal-only expressions such as `6 / 2` are ignored.
+
+**Why it matters**
+
+Integer division silently truncates towards zero. In token arithmetic this can cause value to be drained: `1_000_001 / 2` returns `500_000`, losing one unit. Prefer `checked_div` or explicit rounding logic when the result must be exact.
+
+**Limitations**
+
+- Syntactic only; does not track operand types.
+- May flag intentional floor division; treat as a review signal.
+
+**Fixture:** `test-contracts/division-vulnerable/`, `test-contracts/division-safe/`
+
+---
+
+## `panic-in-contract` (Medium)
+
+**Status:** Phase 3
+
+**What it detects**
+
+Inside `#[contractimpl]` methods:
+
+- `.unwrap()` and `.expect(…)` method calls.
+- `panic!(…)` and `unreachable!()` macro invocations.
+
+**Why it matters**
+
+`panic!` and its equivalents abort the transaction with an unhelpful, opaque error. Prefer `env.panic_with_error` (typed SDK errors) or returning a `Result` with a descriptive error type so callers receive actionable feedback.
+
+**Limitations**
+
+- Flags all `unwrap` / `expect` calls regardless of whether the `Option` / `Result` can actually be `None` / `Err` at runtime.
+- Does not distinguish `unwrap_or`, `unwrap_or_default`, etc. (those are not flagged).
+
+**Fixture:** `test-contracts/panic-vulnerable/`, `test-contracts/panic-safe/`
+
+---
+
+## `missing-zero-address-check` (Medium)
+
+**Status:** Phase 3
+
+**What it detects**
+
+Public `#[contractimpl]` methods whose name matches a set of sensitive admin/ownership entrypoints (e.g. `set_owner`, `set_admin`, `initialize`, `transfer_ownership`, …) that:
+
+1. Accept at least one `Address` parameter, **and**
+2. Do not contain any of: `require_auth`, an `assert!` / `require!` macro, or a call whose name contains `zero`, `default`, `check_address`, `assert`, or `validate`.
+
+**Why it matters**
+
+Passing a zero or default `Address` to an admin function can permanently lock the contract if there is no recovery path. A simple non-zero guard at the entry point prevents this.
+
+**Limitations**
+
+- Name-list heuristic; extend `SENSITIVE_NAMES` in `crates/checks/src/zero_address.rs` for custom entrypoint names.
+- Any matching call name clears the finding regardless of whether it actually validates the address value.
+
+**Fixture:** `test-contracts/zero-address-vulnerable/`, `test-contracts/zero-address-safe/`

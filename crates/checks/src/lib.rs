@@ -2,20 +2,28 @@
 
 pub mod admin;
 pub mod auth;
+pub mod division;
 pub mod hardcoded_address;
 pub mod overflow;
+pub mod panics;
+pub mod reentrancy;
 pub mod std_imports;
 pub mod storage;
 pub mod ttl;
+pub mod zero_address;
 mod util;
 
 pub use admin::UnprotectedAdminCheck;
 pub use auth::MissingRequireAuthCheck;
+pub use division::IntegerDivisionTruncationCheck;
 pub use hardcoded_address::HardcodedAddressCheck;
 pub use overflow::UncheckedArithmeticCheck;
+pub use panics::PanicInContractCheck;
+pub use reentrancy::ReentrancyRiskCheck;
 pub use std_imports::ForbiddenStdImportsCheck;
 pub use storage::UnsafeStoragePatternsCheck;
 pub use ttl::MissingTtlExtensionCheck;
+pub use zero_address::MissingZeroAddressCheck;
 
 use serde::Serialize;
 use syn::File;
@@ -63,5 +71,9 @@ pub fn default_checks() -> Vec<Box<dyn Check + Send + Sync>> {
         Box::new(MissingTtlExtensionCheck),
         Box::new(ForbiddenStdImportsCheck),
         Box::new(HardcodedAddressCheck),
+        Box::new(ReentrancyRiskCheck),
+        Box::new(IntegerDivisionTruncationCheck),
+        Box::new(PanicInContractCheck),
+        Box::new(MissingZeroAddressCheck),
     ]
 }
