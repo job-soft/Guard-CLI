@@ -96,5 +96,6 @@ pub fn default_checks() -> Vec<Box<dyn Check + Send + Sync>> {
         Box::new(SymbolKeyCollisionCheck),
         Box::new(SelfTransferCheck),
         Box::new(MissingZeroAddressCheck),
+        Box::new(MutableGlobalStateCheck),
     ]
 }
