@@ -3,29 +3,41 @@
 pub mod admin;
 pub mod annotations;
 pub mod auth;
+pub mod delegate;
+pub mod division;
+pub mod events;
 pub mod global_state;
 pub mod hardcoded_address;
+pub mod key_collision;
 pub mod overflow;
 pub mod panics;
 pub mod reentrancy;
 pub mod std_imports;
 pub mod storage;
+pub mod transfer;
 pub mod ttl;
 pub mod xc_input;
+pub mod zero_address;
 mod util;
 
 pub use admin::UnprotectedAdminCheck;
 pub use annotations::MissingContractAnnotationCheck;
 pub use auth::MissingRequireAuthCheck;
+pub use delegate::DelegateCallRiskCheck;
+pub use division::IntegerDivisionTruncationCheck;
+pub use events::MissingEventEmissionCheck;
 pub use global_state::MutableGlobalStateCheck;
 pub use hardcoded_address::HardcodedAddressCheck;
+pub use key_collision::SymbolKeyCollisionCheck;
 pub use overflow::UncheckedArithmeticCheck;
 pub use panics::PanicInContractCheck;
 pub use reentrancy::ReentrancyRiskCheck;
 pub use std_imports::ForbiddenStdImportsCheck;
 pub use storage::UnsafeStoragePatternsCheck;
+pub use transfer::SelfTransferCheck;
 pub use ttl::MissingTtlExtensionCheck;
 pub use xc_input::UnsafeCrossContractInputCheck;
+pub use zero_address::MissingZeroAddressCheck;
 
 use serde::Serialize;
 use syn::File;
@@ -78,5 +90,11 @@ pub fn default_checks() -> Vec<Box<dyn Check + Send + Sync>> {
         Box::new(HardcodedAddressCheck),
         Box::new(UnsafeCrossContractInputCheck),
         Box::new(MissingContractAnnotationCheck),
+        Box::new(DelegateCallRiskCheck),
+        Box::new(IntegerDivisionTruncationCheck),
+        Box::new(MissingEventEmissionCheck),
+        Box::new(SymbolKeyCollisionCheck),
+        Box::new(SelfTransferCheck),
+        Box::new(MissingZeroAddressCheck),
     ]
 }

@@ -143,3 +143,129 @@ The Soroban SDK requires a `#[contract]` struct to be present alongside `#[contr
 - Only `#[contract]` on a `struct` item is recognized.
 
 **Fixture:** tests in `crates/checks/src/annotations.rs`
+
+---
+
+## `delegate-call-risk` (High)
+
+**Status:** Phase 3
+
+**What it detects**
+
+In `#[contractimpl]` methods: a call to `invoke_contract` or `try_call` where the contract address argument originates from `env.storage().*.get()` (i.e. a stored address), which indicates a dynamic delegate-like call pattern that can be exploited if the stored address is attacker-controlled.
+
+**Why it matters**
+
+Invoking contracts from a storage-derived address is effectively a delegate call — if an attacker can manipulate the stored address, they can execute arbitrary contract logic.
+
+**Limitations**
+
+- Only detects when the address comes from storage in the same function; cross-function dataflow is not tracked.
+- Intentional use (e.g. proxy patterns) is still flagged — review and suppress as needed.
+
+**Fixture:** tests in `crates/checks/src/delegate.rs`
+
+---
+
+## `integer-division-truncation` (Medium)
+
+**Status:** Phase 2
+
+**What it detects**
+
+Inside `#[contractimpl]` methods: integer division (`/`) and compound division-assignment (`/=`) where at least one side is not a literal.
+
+**Why it matters**
+
+Integer division truncates the fractional part, which can lead to precision loss in financial calculations (e.g. fee splitting, reward distribution).
+
+**Limitations**
+
+- Syntactic only — any non-literal divisor triggers the finding regardless of actual values.
+- Does not detect `checked_div` misuse or rounding strategies.
+
+**Fixture:** tests in `crates/checks/src/division.rs`
+
+---
+
+## `missing-event-emission` (Medium)
+
+**Status:** Phase 3
+
+**What it detects**
+
+In `#[contractimpl]` methods: storage mutations (`set`, `remove`, `extend_ttl`, `bump`, `append`) that occur in a function body that contains no call to `env.events().publish()`.
+
+**Why it matters**
+
+On-chain state changes should be accompanied by events so that off-chain indexers and users can observe state transitions. Silent state changes reduce transparency.
+
+**Limitations**
+
+- Does not verify that the event payload matches the mutation.
+- Events published in helper functions called by the method are not detected.
+
+**Fixture:** tests in `crates/checks/src/events.rs`
+
+---
+
+## `symbol-key-collision` (Medium)
+
+**Status:** Phase 3
+
+**What it detects**
+
+Within a single `#[contractimpl]` impl block: duplicate `symbol_short!("…")` keys used in `env.storage().instance().get(…)`, `.set(…)`, or `.has(…)` calls.
+
+**Why it matters**
+
+Duplicate storage keys cause silent overwrites. Two contract functions writing different data under the same `Symbol` key will clobber each other, leading to data corruption.
+
+**Limitations**
+
+- Only compares keys that share the same `#[contractimpl]` block; cross-block duplicates are not detected.
+- Only `symbol_short!` is analyzed; `Symbol::new` with the same string literal is not matched.
+
+**Fixture:** tests in `crates/checks/src/key_collision.rs`
+
+---
+
+## `self-transfer` (Medium)
+
+**Status:** Phase 3
+
+**What it detects**
+
+In `#[contractimpl]` methods: calls to token transfer functions (`transfer`, `transfer_from`, `xfer`, `send`, etc.) where there is no guard checking that `from != to` (e.g. `if from != to { … }` or `assert!(from != to, …)`).
+
+**Why it matters**
+
+Self-transfers waste ledger space, waste the caller's gas, and may indicate a logic bug or missing validation in the contract.
+
+**Limitations**
+
+- Guard detection is structural (presence of a comparison expression in the body); complex guard logic may not be recognized.
+- Only functions with "transfer" or "send" in the name are inspected.
+
+**Fixture:** tests in `crates/checks/src/transfer.rs`
+
+---
+
+## `missing-zero-address-check` (Medium)
+
+**Status:** Phase 3
+
+**What it detects**
+
+In `#[contractimpl]` methods whose name matches a sensitive set (e.g. `set_owner`, `set_admin`, `initialize`, `init`): function parameters of type `Address` that are not guarded by a zero-address check (`require_auth`, `assert`, or comparison against a default/zero address) before being used.
+
+**Why it matters**
+
+Setting an admin or owner to `Address::default()` (the zero address) can permanently lock privileged functions. The check ensures that sensitive address parameters are validated before use.
+
+**Limitations**
+
+- Guard detection is heuristic — only standard patterns are recognized.
+- External validation in helper functions is not tracked.
+
+**Fixture:** tests in `crates/checks/src/zero_address.rs`
