@@ -21,7 +21,10 @@ impl Check for PanicInContractCheck {
         let mut out = Vec::new();
         for method in contractimpl_functions(file) {
             let fn_name = method.sig.ident.to_string();
-            let mut v = PanicVisitor { fn_name: fn_name.clone(), out: &mut out };
+            let mut v = PanicVisitor {
+                fn_name: fn_name.clone(),
+                out: &mut out,
+            };
             v.visit_block(&method.block);
         }
         out
@@ -58,18 +61,18 @@ impl PanicVisitor<'_> {
                 "https://github.com/SorobanGuard/Guard-CLI/blob/main/docs/checks.md#panic-in-contract-medium"
                     .to_string(),
             ),
-            suggestion: None,
+                suggestion: None,
         });
     }
 }
 
 impl<'ast> Visit<'ast> for PanicVisitor<'_> {
-    fn visit_macro(&mut self, mac: &'ast syn::Macro) {
-        let name = macro_name(mac);
+    fn visit_macro(&mut self, i: &'ast syn::Macro) {
+        let name = macro_name(i);
         if matches!(name.as_str(), "panic" | "unreachable") {
             self.push(mac.span().start().line, &format!("{name}!"));
         }
-        visit::visit_macro(self, mac);
+        visit::visit_macro(self, i);
     }
 
     fn visit_expr_method_call(&mut self, i: &'ast ExprMethodCall) {

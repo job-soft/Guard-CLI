@@ -82,7 +82,10 @@ impl Check for UnprotectedAdminCheck {
 }
 
 fn is_sensitive_name(name: &str) -> bool {
-    SENSITIVE_NAMES.contains(&name) || SENSITIVE_PREFIXES.iter().any(|prefix| name.starts_with(prefix))
+    SENSITIVE_NAMES.contains(&name)
+        || SENSITIVE_PREFIXES
+            .iter()
+            .any(|prefix| name.starts_with(prefix))
 }
 
 fn receiver_chain_contains_storage(expr: &Expr) -> bool {
